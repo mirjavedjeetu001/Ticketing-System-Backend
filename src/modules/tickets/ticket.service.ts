@@ -740,27 +740,46 @@ export class TicketService {
     if (!mentions || mentions.length === 0) return [];
 
     const userIds: string[] = [];
+    const processedEmails = new Set<string>(); // Track processed emails to avoid duplicates
     
     for (const mention of mentions) {
       try {
+        const cleanMention = mention.trim();
+        
         // Check if mention looks like an email
-        if (mention.includes('@') && mention.includes('.')) {
-          const user = await User.findOne({ email: mention, isActive: true });
+        if (cleanMention.includes('@') && cleanMention.includes('.')) {
+          // Skip if we already processed this email
+          if (processedEmails.has(cleanMention.toLowerCase())) {
+            continue;
+          }
+          
+          const user = await User.findOne({ 
+            email: { $regex: new RegExp(`^${cleanMention}$`, 'i') }, 
+            isActive: true 
+          });
+          
           if (user) {
             userIds.push(user._id.toString());
+            processedEmails.add(cleanMention.toLowerCase());
+          } else {
+            console.log(`User not found for email: ${cleanMention}`);
           }
         } else {
-          // Try to find user by name (firstName or lastName)
+          // Try to find user by username or name (firstName or lastName)
           const users = await User.find({
             isActive: true,
             $or: [
-              { firstName: { $regex: mention, $options: 'i' } },
-              { lastName: { $regex: mention, $options: 'i' } }
+              { username: { $regex: cleanMention, $options: 'i' } },
+              { firstName: { $regex: cleanMention, $options: 'i' } },
+              { lastName: { $regex: cleanMention, $options: 'i' } }
             ]
-          });
+          }).limit(5); // Limit to prevent too many matches
           
           for (const user of users) {
-            userIds.push(user._id.toString());
+            const userId = user._id.toString();
+            if (!userIds.includes(userId)) {
+              userIds.push(userId);
+            }
           }
         }
       } catch (error) {
@@ -768,7 +787,7 @@ export class TicketService {
       }
     }
     
-    // Remove duplicates
+    // Remove duplicates and return
     return [...new Set(userIds)];
   }
 
