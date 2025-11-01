@@ -50,6 +50,13 @@ export class TicketService {
     mentions?: string[];
     estimatedHours?: number;
     dueDate?: Date;
+    attachments?: Array<{
+      filename: string;
+      originalName: string;
+      mimeType: string;
+      size: number;
+      uploadedAt: Date;
+    }>;
   }): Promise<ITicket> {
     // Validate required fields
     if (!ticketData.productId) {
@@ -80,7 +87,8 @@ export class TicketService {
         defaultPriorityId = category.defaultPriorityId.toString();
       } else {
         // Suggest priority based on severity and existing SLA rules
-        defaultPriorityId = await SLAService.getSuggestedPriority(ticketData.severityId);
+        const suggestedPriority = await SLAService.getSuggestedPriority(ticketData.severityId);
+        defaultPriorityId = suggestedPriority || undefined;
       }
 
       // Calculate SLA times using the new service
@@ -123,6 +131,7 @@ export class TicketService {
       slaResolutionDue: resolutionTime,
       status: 'open',
       ticketId,
+      attachments: ticketData.attachments || [],
     });
 
     // Add initial activity log
@@ -218,7 +227,7 @@ export class TicketService {
     }
 
     // Check permissions
-    const canUpdate = this.canUserModifyTicket(ticket, userId, userRole);
+    const canUpdate = await this.canUserModifyTicket(ticket, userId, userRole);
     if (!canUpdate) {
       throw new AuthorizationError('Not authorized to update this ticket');
     }
@@ -307,7 +316,7 @@ export class TicketService {
     }
 
     // Only admins or ticket creator can delete
-    if (userRole !== 'admin' && ticket.createdBy.toString() !== userId) {
+    if (userRole !== 'admin' && userRole !== 'super_admin' && ticket.createdBy.toString() !== userId) {
       throw new AuthorizationError('Not authorized to delete this ticket');
     }
 
@@ -407,7 +416,14 @@ export class TicketService {
     ticketId: string,
     content: string,
     authorId: string,
-    isInternal = false
+    isInternal = false,
+    attachments?: Array<{
+      filename: string;
+      originalName: string;
+      mimeType: string;
+      size: number;
+      uploadedAt: Date;
+    }>
   ): Promise<ITicket> {
     const ticket = await this.findTicket(ticketId);
     if (!ticket) {
@@ -424,18 +440,26 @@ export class TicketService {
 
     // Add new mentioned users to the ticket's mentionedUsers array (avoid duplicates)
     if (newMentionedUserIds.length > 0) {
-      const existingMentionedUsers = ticket.mentionedUsers.map(id => id.toString());
+      const existingMentionedUsers = ticket.mentionedUsers?.map(id => id.toString()) || [];
       const uniqueNewMentions = newMentionedUserIds.filter(id => !existingMentionedUsers.includes(id));
       
       if (uniqueNewMentions.length > 0) {
+        if (!ticket.mentionedUsers) ticket.mentionedUsers = [];
         ticket.mentionedUsers.push(...uniqueNewMentions as any);
         
         // Add to mentions array as well
         const newMentionNames = commentMentions.filter((mention, index) => 
-          newMentionedUserIds[index] && !ticket.mentions.includes(mention)
+          newMentionedUserIds[index] && !(ticket.mentions || []).includes(mention)
         );
+        if (!ticket.mentions) ticket.mentions = [];
         ticket.mentions.push(...newMentionNames);
       }
+    }
+
+    // Add comment attachments to ticket attachments
+    if (attachments && attachments.length > 0) {
+      if (!ticket.attachments) ticket.attachments = [];
+      ticket.attachments.push(...attachments);
     }
 
     // Add comment
@@ -447,11 +471,12 @@ export class TicketService {
     });
 
     // Add activity log for the comment
+    const commentText = content || (attachments && attachments.length > 0 ? `${attachments.length} attachment(s)` : '');
     await this.addActivityLog(
       ticket,
       authorId,
       'comment_added',
-      `Added ${isInternal ? 'internal ' : ''}comment: "${content.length > 50 ? content.substring(0, 50) + '...' : content}"`
+      `Added ${isInternal ? 'internal ' : ''}comment: "${commentText.length > 50 ? commentText.substring(0, 50) + '...' : commentText}"`
     );
 
     // Add activity log for new mentions in comment
@@ -564,7 +589,7 @@ export class TicketService {
     }
 
     if (filter.product) {
-      query.product = filter.product;
+      query.productId = filter.product;
     }
 
     if (filter.tags && filter.tags.length > 0) {
@@ -601,19 +626,46 @@ export class TicketService {
     return query;
   }
 
-  private static canUserModifyTicket(
+  private static async canUserModifyTicket(
     ticket: ITicket,
     userId: string,
     userRole: string
-  ): boolean {
+  ): Promise<boolean> {
     // Admins can modify any ticket
-    if (userRole === 'admin') return true;
+    if (userRole === 'admin' || userRole === 'super_admin') {
+      return true;
+    }
 
     // Ticket creators can modify their own tickets
-    if (ticket.createdBy.toString() === userId) return true;
+    if (ticket.createdBy.toString() === userId) {
+      return true;
+    }
 
     // Assigned agents can modify tickets assigned to them
-    if (userRole === 'agent' && ticket.assignee?.toString() === userId) return true;
+    if (ticket.assignee?.toString() === userId) {
+      return true;
+    }
+
+    // Mentioned users can modify tickets they're mentioned in
+    if (ticket.mentions && ticket.mentions.some((m: any) => m.toString() === userId)) {
+      return true;
+    }
+
+    // Department members can modify tickets assigned to their department
+    if (ticket.assignedDepartmentId) {
+      const user = await User.findById(userId);
+      if (user?.departmentId?.toString() === ticket.assignedDepartmentId.toString()) {
+        return true;
+      }
+    }
+
+    // Product team members can modify tickets assigned to product team
+    if (ticket.assignToProductTeam) {
+      const user = await User.findById(userId).populate('productAccess');
+      if (user?.productAccess?.some((p: any) => p.toString() === ticket.productId.toString())) {
+        return true;
+      }
+    }
 
     return false;
   }
@@ -630,7 +682,7 @@ export class TicketService {
     }
 
     // Check permissions: Only assignees (including department members) and admins can resolve tickets
-    if (userRole !== 'admin') {
+    if (userRole !== 'admin' && userRole !== 'super_admin') {
       const canResolve = await this.canUserResolveTicket(ticket, userId);
       if (!canResolve) {
         throw new AuthorizationError('Only assigned members can resolve tickets');
@@ -671,7 +723,7 @@ export class TicketService {
     }
 
     // Check permissions: Only ticket creators and admins can close tickets
-    if (userRole !== 'admin' && ticket.createdBy.toString() !== userId) {
+    if (userRole !== 'admin' && userRole !== 'super_admin' && ticket.createdBy.toString() !== userId) {
       throw new AuthorizationError('Only ticket creators can close tickets');
     }
 

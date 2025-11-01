@@ -11,9 +11,9 @@ router.get('/categories', auth, ProductController.getCategories);
 router.get('/', auth, ProductController.getProducts);
 router.get('/:id', auth, ProductController.getProduct);
 
-// Admin only routes
-router.post('/', auth, requireRole('admin'), ProductController.createProduct);
-router.put('/:id', auth, requireRole('admin'), ProductController.updateProduct);
-router.delete('/:id', auth, requireRole('admin'), ProductController.deleteProduct);
+// Admin only routes (super_admin and admin)
+router.post('/', auth, requireRole(['super_admin', 'admin']), ProductController.createProduct);
+router.put('/:id', auth, requireRole(['super_admin', 'admin']), ProductController.updateProduct);
+router.delete('/:id', auth, requireRole(['super_admin', 'admin']), ProductController.deleteProduct);
 
 export default router;

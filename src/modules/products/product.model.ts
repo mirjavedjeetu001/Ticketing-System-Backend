@@ -6,6 +6,7 @@ export interface IProduct extends Document {
   abbreviation?: string;
   description?: string;
   category: string;
+  businessUnitId?: Schema.Types.ObjectId;
   departments: string[]; // Which departments can access this product
   isActive: boolean;
   icon?: string;
@@ -35,6 +36,11 @@ const ProductSchema = new Schema<IProduct>({
     type: String,
     required: [true, 'Product category is required'],
     trim: true,
+  },
+  businessUnitId: {
+    type: Schema.Types.ObjectId,
+    ref: 'BusinessUnit',
+    required: false,
   },
   departments: [{
     type: String,

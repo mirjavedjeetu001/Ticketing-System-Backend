@@ -6,14 +6,21 @@ import { Types } from 'mongoose';
 export class DepartmentService {
   static async createDepartment(departmentData: {
     name: string;
+    shortName?: string;
     description?: string;
+    businessUnitId?: string;
     members?: string[];
     head?: string;
   }): Promise<IDepartment> {
-    // Validate department name is unique
-    const existingDepartment = await Department.findOne({ name: departmentData.name });
+    // Validate department name is unique within the business unit (if provided)
+    const query: any = { name: departmentData.name };
+    if (departmentData.businessUnitId) {
+      query.businessUnitId = departmentData.businessUnitId;
+    }
+    
+    const existingDepartment = await Department.findOne(query);
     if (existingDepartment) {
-      throw new ValidationError('Department name already exists');
+      throw new ValidationError('Department name already exists in this business unit');
     }
 
     // Validate members exist
@@ -36,6 +43,7 @@ export class DepartmentService {
 
     const department = new Department({
       ...departmentData,
+      businessUnitId: departmentData.businessUnitId ? new Types.ObjectId(departmentData.businessUnitId) : undefined,
       members: departmentData.members?.map(id => new Types.ObjectId(id)) || [],
       head: departmentData.head ? new Types.ObjectId(departmentData.head) : undefined,
     });
@@ -56,8 +64,34 @@ export class DepartmentService {
     return department;
   }
 
-  static async listDepartments(): Promise<IDepartment[]> {
-    return Department.find({ isActive: true })
+  static async listDepartments(filters?: {
+    businessUnitId?: string;
+    isActive?: boolean;
+  }): Promise<IDepartment[]> {
+    const query: any = {};
+    
+    if (filters?.businessUnitId) {
+      query.businessUnitId = filters.businessUnitId;
+    }
+    
+    if (filters?.isActive !== undefined) {
+      query.isActive = filters.isActive;
+    } else {
+      query.isActive = true; // Default to active only
+    }
+    
+    return Department.find(query)
+      .populate('businessUnitId', 'name shortName')
+      .populate('members', 'firstName lastName email role department')
+      .populate('head', 'firstName lastName email role')
+      .sort({ name: 1 });
+  }
+
+  static async getDepartmentsByBusinessUnit(businessUnitId: string): Promise<IDepartment[]> {
+    return Department.find({ 
+      businessUnitId: new Types.ObjectId(businessUnitId),
+      isActive: true 
+    })
       .populate('members', 'firstName lastName email role department')
       .populate('head', 'firstName lastName email role')
       .sort({ name: 1 });
@@ -80,7 +114,7 @@ export class DepartmentService {
       throw new ValidationError('User is already a member of this department');
     }
 
-    department.members.push(new Types.ObjectId(userId));
+    department.members.push(userId as any);
     await department.save();
 
     return this.getDepartmentById(department._id);

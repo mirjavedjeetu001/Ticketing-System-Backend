@@ -4,16 +4,21 @@ import cors from 'cors';
 import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
 import { config } from './config';
 import { errorHandler } from './common/errors/errorHandler';
 import { logger } from './common/logger';
 import routes from './routes';
+import { UPLOAD_DIR } from './config/multer';
 
 const app = express();
 
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: false, // Disable CSP for development
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin resource loading
+  crossOriginEmbedderPolicy: false, // Allow embedding resources
+  frameguard: false, // Disable X-Frame-Options to allow iframe embedding
 }));
 
 // CORS configuration
@@ -57,6 +62,29 @@ if (config.nodeEnv !== 'test') {
   }));
 }
 
+// Serve uploaded files (IMPORTANT: This must be before the 404 handler)
+app.use('/uploads', express.static(UPLOAD_DIR, {
+  setHeaders: (res, filePath) => {
+    // Set CORS headers for uploaded files
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    
+    // Set appropriate content type based on file extension
+    const ext = path.extname(filePath).toLowerCase();
+    const contentTypes: { [key: string]: string } = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.pdf': 'application/pdf',
+      '.txt': 'text/plain',
+    };
+    if (contentTypes[ext]) {
+      res.setHeader('Content-Type', contentTypes[ext]);
+    }
+  }
+}));
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -70,11 +98,11 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api', routes);
 
-// 404 handler
-app.use('*', (req, res) => {
+// 404 handler - Only for API routes, not static files
+app.use('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: `Route ${req.originalUrl} not found`,
+    message: `API route ${req.originalUrl} not found`,
   });
 });
 

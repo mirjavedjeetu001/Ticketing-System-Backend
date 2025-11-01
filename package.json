@@ -13,9 +13,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "clean": "rimraf dist",
-    "create-admin": "ts-node scripts/create-admin.ts"
-
-
+    "create-admin": "ts-node scripts/create-admin.ts",
+    "setup-super-admin": "ts-node scripts/setup-super-admin.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -25,11 +24,13 @@
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
+    "gridfs-stream": "^1.1.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.6.0",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
+    "multer-gridfs-storage": "^5.0.2",
     "pino": "^8.16.1",
     "pino-pretty": "^13.1.2"
   },

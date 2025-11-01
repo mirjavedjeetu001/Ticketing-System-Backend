@@ -6,6 +6,7 @@ export class ProductService {
     name: string;
     description?: string;
     category: string;
+    businessUnitId?: string;
     departments: string[];
     icon?: string;
     color?: string;
@@ -18,12 +19,13 @@ export class ProductService {
 
     const product = new Product(productData);
     await product.save();
+    await product.populate('businessUnitId', 'name description');
     
     return product;
   }
 
   static async getProductById(id: string): Promise<IProduct> {
-    const product = await Product.findById(id);
+    const product = await Product.findById(id).populate('businessUnitId', 'name description');
     if (!product) {
       throw new NotFoundError('Product not found');
     }
@@ -35,14 +37,14 @@ export class ProductService {
     return Product.find({ 
       departments: department, 
       isActive: true 
-    }).sort({ name: 1 });
+    }).populate('businessUnitId', 'name description').sort({ name: 1 });
   }
 
   static async getProductsByIds(productIds: string[]): Promise<IProduct[]> {
     return Product.find({ 
       _id: { $in: productIds }, 
       isActive: true 
-    }).sort({ name: 1 });
+    }).populate('businessUnitId', 'name description').sort({ name: 1 });
   }
 
   static async getAllProducts(filter: {
@@ -72,7 +74,7 @@ export class ProductService {
       ];
     }
 
-    return Product.find(query).sort({ name: 1 });
+    return Product.find(query).populate('businessUnitId', 'name description').sort({ name: 1 });
   }
 
   static async updateProduct(id: string, updateData: Partial<IProduct>): Promise<IProduct> {
@@ -80,7 +82,7 @@ export class ProductService {
       id,
       updateData,
       { new: true, runValidators: true }
-    );
+    ).populate('businessUnitId', 'name description');
     
     if (!product) {
       throw new NotFoundError('Product not found');

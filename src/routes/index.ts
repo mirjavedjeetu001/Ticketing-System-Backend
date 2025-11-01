@@ -7,6 +7,9 @@ import categoryRoutes from '../modules/categories/category.routes';
 import departmentRoutes from '../modules/departments/department.routes';
 import systemSettingsRoutes from '../modules/system-settings/system-settings.routes';
 import featureRoutes from '../modules/features/feature.routes';
+import companyRoutes from '../modules/companies/company.routes';
+import businessUnitRoutes from '../modules/business-units/business-unit.routes';
+import teamRoutes from '../modules/teams/team.routes';
 
 const router = Router();
 
@@ -28,5 +31,8 @@ router.use('/categories', categoryRoutes);
 router.use('/departments', departmentRoutes);
 router.use('/system-settings', systemSettingsRoutes);
 router.use('/features', featureRoutes);
+router.use('/companies', companyRoutes);
+router.use('/business-units', businessUnitRoutes);
+router.use('/teams', teamRoutes);
 
 export default router;

@@ -2,15 +2,19 @@ import { Router } from 'express';
 import { TicketController } from './ticket.controller';
 import { auth } from '../../common/middleware/auth';
 import { requireAgentOrAdmin } from '../../common/middleware/roles';
+import { upload } from '../../config/multer';
 
 const router = Router();
 
-// All ticket routes require authentication
+// Attachment route (serve files from MongoDB) - No auth required for viewing attachments
+router.get('/attachments/:filename', TicketController.getAttachment);
+
+// All other ticket routes require authentication
 router.use(auth);
 
 // Public ticket routes (all authenticated users)
 router.get('/', TicketController.list);
-router.post('/', TicketController.create);
+router.post('/', upload.array('attachments', 5), TicketController.create); // Allow up to 5 files
 router.get('/stats', TicketController.getStats);
 router.get('/:id', TicketController.getById);
 router.put('/:id', TicketController.update);
@@ -24,6 +28,6 @@ router.post('/:id/resolve', TicketController.resolveTicket);
 router.post('/:id/close', TicketController.closeTicket);
 
 // Comment routes
-router.post('/:id/comments', TicketController.addComment);
+router.post('/:id/comments', upload.array('attachments', 5), TicketController.addComment); // Allow up to 5 files per comment
 
 export default router;

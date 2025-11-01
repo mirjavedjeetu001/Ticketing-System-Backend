@@ -5,8 +5,8 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || 'fallback-secret-change-in-production',
   jwtExpire: process.env.JWT_EXPIRE || '7d',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
-  rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+  rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute window
+  rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '200'), // 200 requests per minute
   maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '5242880'),
   uploadPath: process.env.UPLOAD_PATH || './uploads',
   logLevel: process.env.LOG_LEVEL || 'info',

@@ -2,6 +2,28 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth';
 import { AuthorizationError } from '../errors/AppError';
 
+// Permission-based authorization middleware
+export const requirePermission = (permission: string) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      return next(new AuthorizationError('Authentication required'));
+    }
+
+    // Super admins have all permissions
+    if (req.user.role === 'super_admin') {
+      return next();
+    }
+
+    // Check if user has the required permission
+    const permissions = req.user.permissions || {};
+    if (!permissions[permission as keyof typeof permissions]) {
+      return next(new AuthorizationError(`Access denied. Required permission: ${permission}`));
+    }
+
+    next();
+  };
+};
+
 // Role-based authorization middleware
 export const requireRole = (roles: string | string[]) => {
   const allowedRoles = Array.isArray(roles) ? roles : [roles];
@@ -19,11 +41,11 @@ export const requireRole = (roles: string | string[]) => {
   };
 };
 
-// Admin only middleware
-export const requireAdmin = requireRole('admin');
+// Admin only middleware (includes super_admin)
+export const requireAdmin = requireRole(['super_admin', 'admin']);
 
-// Agent or admin middleware
-export const requireAgentOrAdmin = requireRole(['agent', 'admin']);
+// Agent or admin middleware (includes super_admin)
+export const requireAgentOrAdmin = requireRole(['super_admin', 'agent', 'admin']);
 
 // Check if user can access resource based on ownership or role
 export const requireOwnershipOrRole = (roles: string | string[] = []) => {
@@ -34,8 +56,8 @@ export const requireOwnershipOrRole = (roles: string | string[] = []) => {
       return next(new AuthorizationError('Authentication required'));
     }
 
-    // Admins can access everything
-    if (req.user.role === 'admin') {
+    // Super admins and admins can access everything
+    if (req.user.role === 'super_admin' || req.user.role === 'admin') {
       return next();
     }
 
@@ -60,8 +82,8 @@ export const requireSameDepartmentOrAdmin = (req: AuthRequest, res: Response, ne
     return next(new AuthorizationError('Authentication required'));
   }
 
-  // Admins can access everything
-  if (req.user.role === 'admin') {
+  // Super admins and admins can access everything
+  if (req.user.role === 'super_admin' || req.user.role === 'admin') {
     return next();
   }
 

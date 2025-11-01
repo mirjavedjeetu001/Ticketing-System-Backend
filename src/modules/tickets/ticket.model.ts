@@ -26,6 +26,8 @@ export interface ITicket extends Document {
     mimeType: string;
     size: number;
     uploadedAt: Date;
+    data?: string; // Base64 encoded file data stored in MongoDB
+    url?: string; // Local file path for backward compatibility
   }[];
   comments: {
     author: Schema.Types.ObjectId;
@@ -157,10 +159,12 @@ const TicketSchema = new Schema<ITicket>({
     mimeType: { type: String, required: true },
     size: { type: Number, required: true },
     uploadedAt: { type: Date, default: Date.now },
+    data: { type: String }, // Base64 encoded file data (stored in MongoDB)
+    url: { type: String }, // Local file path (for backward compatibility)
   }],
   comments: [{
     author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    content: { type: String, required: true, maxlength: 2000 },
+    content: { type: String, required: false, maxlength: 2000, default: '' },
     createdAt: { type: Date, default: Date.now },
     isInternal: { type: Boolean, default: false },
   }],

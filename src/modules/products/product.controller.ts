@@ -60,7 +60,7 @@ export class ProductController {
       let products: any[] = [];
 
       // Admins see all products
-      if (req.user.role === 'admin') {
+      if (req.user.role === 'admin' || req.user.role === 'super_admin') {
         products = await ProductService.getAllProducts({});
       } else {
         // For other users, get products based on their productAccess array

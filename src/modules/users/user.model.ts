@@ -7,12 +7,33 @@ export interface IUser extends Document {
   password: string;
   firstName: string;
   lastName: string;
-  role: 'admin' | 'agent' | 'user';
+  phone?: string;
+  avatar?: string;
+  role: 'super_admin' | 'admin' | 'business_unit_head' | 'department_head' | 'team_lead' | 'agent' | 'user';
   department?: string;
   departmentId?: Schema.Types.ObjectId;
+  businessUnitId?: Schema.Types.ObjectId;
+  teamId?: Schema.Types.ObjectId;
+  companyId?: Schema.Types.ObjectId;
   productAccess?: Schema.Types.ObjectId[];
+  permissions?: {
+    canCreateTickets?: boolean;
+    canViewAllTickets?: boolean;
+    canAssignTickets?: boolean;
+    canCloseTickets?: boolean;
+    canDeleteTickets?: boolean;
+    canManageUsers?: boolean;
+    canManageTeams?: boolean;
+    canManageDepartments?: boolean;
+    canManageBusinessUnits?: boolean;
+    canManageCompany?: boolean;
+    canViewReports?: boolean;
+    canExportData?: boolean;
+  };
   isActive: boolean;
+  isEmailVerified?: boolean;
   lastLogin?: Date;
+  createdBy?: Schema.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -44,9 +65,16 @@ const UserSchema = new Schema<IUser>({
     required: [true, 'Last name is required'],
     trim: true,
   },
+  phone: {
+    type: String,
+    trim: true,
+  },
+  avatar: {
+    type: String,
+  },
   role: {
     type: String,
-    enum: ['admin', 'agent', 'user'],
+    enum: ['super_admin', 'admin', 'business_unit_head', 'department_head', 'team_lead', 'agent', 'user'],
     default: 'user',
     index: true,
   },
@@ -59,17 +87,90 @@ const UserSchema = new Schema<IUser>({
     ref: 'Department',
     index: true,
   },
+  businessUnitId: {
+    type: Schema.Types.ObjectId,
+    ref: 'BusinessUnit',
+    index: true,
+  },
+  teamId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Team',
+    index: true,
+  },
+  companyId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Company',
+    index: true,
+  },
   productAccess: [{
     type: Schema.Types.ObjectId,
     ref: 'Product',
   }],
+  permissions: {
+    canCreateTickets: {
+      type: Boolean,
+      default: true,
+    },
+    canViewAllTickets: {
+      type: Boolean,
+      default: false,
+    },
+    canAssignTickets: {
+      type: Boolean,
+      default: false,
+    },
+    canCloseTickets: {
+      type: Boolean,
+      default: false,
+    },
+    canDeleteTickets: {
+      type: Boolean,
+      default: false,
+    },
+    canManageUsers: {
+      type: Boolean,
+      default: false,
+    },
+    canManageTeams: {
+      type: Boolean,
+      default: false,
+    },
+    canManageDepartments: {
+      type: Boolean,
+      default: false,
+    },
+    canManageBusinessUnits: {
+      type: Boolean,
+      default: false,
+    },
+    canManageCompany: {
+      type: Boolean,
+      default: false,
+    },
+    canViewReports: {
+      type: Boolean,
+      default: false,
+    },
+    canExportData: {
+      type: Boolean,
+      default: false,
+    },
+  },
   isActive: {
     type: Boolean,
     default: true,
     index: true,
   },
+  isEmailVerified: {
+    type: Boolean,
+    default: false,
+  },
   lastLogin: {
     type: Date,
+  },
+  createdBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
   },
 }, {
   timestamps: true,
@@ -80,6 +181,9 @@ UserSchema.index({ email: 1, isActive: 1 });
 UserSchema.index({ role: 1, isActive: 1 });
 UserSchema.index({ department: 1, isActive: 1 });
 UserSchema.index({ departmentId: 1, isActive: 1 });
+UserSchema.index({ businessUnitId: 1, isActive: 1 });
+UserSchema.index({ teamId: 1, isActive: 1 });
+UserSchema.index({ companyId: 1, isActive: 1 });
 UserSchema.index({ productAccess: 1, isActive: 1 });
 
 // Virtual for full name

@@ -6,11 +6,7 @@ import { ValidationError } from '../../common/errors/AppError';
 export class DepartmentController {
   static async create(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      if (!req.user || req.user.role !== 'admin') {
-        throw new ValidationError('Admin access required');
-      }
-
-      const { name, description, members, head } = req.body;
+      const { name, shortName, description, businessUnitId, members, head } = req.body;
 
       if (!name) {
         throw new ValidationError('Department name is required');
@@ -18,7 +14,9 @@ export class DepartmentController {
 
       const department = await DepartmentService.createDepartment({
         name,
+        shortName,
         description,
+        businessUnitId,
         members,
         head,
       });
@@ -35,7 +33,27 @@ export class DepartmentController {
 
   static async list(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const departments = await DepartmentService.listDepartments();
+      const { businessUnitId, isActive } = req.query;
+      
+      const filters: any = {};
+      if (businessUnitId) filters.businessUnitId = businessUnitId as string;
+      if (isActive !== undefined) filters.isActive = isActive === 'true';
+      
+      const departments = await DepartmentService.listDepartments(filters);
+
+      res.json({
+        success: true,
+        data: { departments },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getByBusinessUnit(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { businessUnitId } = req.params;
+      const departments = await DepartmentService.getDepartmentsByBusinessUnit(businessUnitId);
 
       res.json({
         success: true,
@@ -62,10 +80,6 @@ export class DepartmentController {
 
   static async update(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      if (!req.user || req.user.role !== 'admin') {
-        throw new ValidationError('Admin access required');
-      }
-
       const { id } = req.params;
       const updateData = req.body;
 
@@ -83,10 +97,6 @@ export class DepartmentController {
 
   static async delete(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      if (!req.user || req.user.role !== 'admin') {
-        throw new ValidationError('Admin access required');
-      }
-
       const { id } = req.params;
       await DepartmentService.deleteDepartment(id);
 
@@ -101,10 +111,6 @@ export class DepartmentController {
 
   static async addMember(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      if (!req.user || req.user.role !== 'admin') {
-        throw new ValidationError('Admin access required');
-      }
-
       const { id } = req.params;
       const { userId } = req.body;
 
@@ -126,10 +132,6 @@ export class DepartmentController {
 
   static async removeMember(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      if (!req.user || req.user.role !== 'admin') {
-        throw new ValidationError('Admin access required');
-      }
-
       const { id, userId } = req.params;
 
       const department = await DepartmentService.removeMemberFromDepartment(id, userId);
@@ -138,6 +140,25 @@ export class DepartmentController {
         success: true,
         message: 'Member removed from department successfully',
         data: { department },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async toggleStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const department = await DepartmentService.getDepartmentById(id);
+      
+      const updatedDepartment = await DepartmentService.updateDepartment(id, {
+        isActive: !department.isActive
+      });
+
+      res.json({
+        success: true,
+        message: `Department ${updatedDepartment.isActive ? 'activated' : 'deactivated'} successfully`,
+        data: { department: updatedDepartment },
       });
     } catch (error) {
       next(error);
